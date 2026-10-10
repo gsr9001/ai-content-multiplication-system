@@ -1,0 +1,11 @@
+# Model and generation settings. Edit freely; no code changes needed.
+model: gpt-4o-mini          # confirm a current model name before the first live run
+temperature: 0.7
+max_transport_retries: 3   # rate limits, timeouts, 5xx
+max_validation_retries: 1  # repair call when JSON fails the schema
+counts:
+  linkedin_posts: 5
+  tweets: 10
+  newsletter_sections: 3
+  substack_notes: 3
+  youtube_scripts: 2
