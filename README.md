@@ -14,11 +14,21 @@ locally and costs nothing. Retries only happen when a request fails or returns i
 
 ## Setup (once)
 
-You need Python 3.10 or newer. From this folder, in PowerShell:
+You need Python 3.10 or newer. From this folder:
+
+Windows (PowerShell):
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
+pip install -e ".[dev]"
+```
+
+macOS / Linux:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -e ".[dev]"
 ```
 
@@ -32,8 +42,9 @@ code, or any file other than `.env`. If a key is ever exposed, rotate it in the 
 
 ## Use
 
-1. Put your article or transcript (`.txt` or `.md`) in `inputs/`.
-2. Run:
+1. Put your article or transcript (`.txt` or `.md`) in `inputs/`. To just try it, use the bundled
+   example, `tests/fixtures/sample_article.md`.
+2. Run (use `/` instead of `\` on macOS / Linux):
 
 ```powershell
 content-engine run inputs\my_article.md
@@ -71,6 +82,8 @@ still saved, the failure is recorded in `run_meta.json`, and the command exits w
 - **Model, temperature, retries, counts:** edit `config\settings.yaml`. Check that the `model`
   name is a current one before your first run.
 - **Prompts:** edit the files in `prompts\`. Keep the `{{placeholders}}` and the JSON output format.
+  The shared rules block (from `# Source fidelity` to just before `# Output format`) must stay
+  identical in all five prompts; a test checks this, so change it in every file.
 - **Calendar times and spacing:** see `CHANNELS` in `src\content_engine\calendar.py`.
 
 ## Project layout
