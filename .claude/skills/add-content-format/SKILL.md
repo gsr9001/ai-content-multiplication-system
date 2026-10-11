@@ -12,7 +12,7 @@ Procedure for adding one new format to `content-engine`. The project-wide rules 
 ## Ground rules
 - Never open, read, print, expose, or commit `.env` or any secret.
 - Never run the application or `pytest -m live` without the user's explicit approval. A full run adds one more billable OpenAI request.
-- Offline tests only. Ask for approval once before running them (Step 4).
+- Offline tests only. Ask for approval once before running them (Step 5).
 - Never overwrite or delete anything in `outputs/`.
 - Only `src/content_engine/llm.py` talks to OpenAI. Do not edit it.
 - Never weaken, delete, or skip an existing test to make it pass. Fix the implementation.
