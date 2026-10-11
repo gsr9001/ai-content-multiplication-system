@@ -10,8 +10,17 @@ Turn one article or transcript into a full content pack, written in your brand v
 - 5 Instagram captions
 - A two-week content calendar (CSV and Markdown)
 
-It uses the OpenAI API. A normal run sends **6 requests** (one per format). The calendar is built
-locally and costs nothing. Retries only happen when a request fails or returns invalid output.
+It uses the OpenAI API. A clean run sends **6 requests** (one per format). The calendar is built
+locally and costs nothing. Extra requests happen in two cases:
+
+- **Repair requests.** If a reply is invalid (bad JSON, wrong item count, over a length limit) or
+  breaks a style rule (see "Quality checks"), the app asks the model to fix it, up to
+  `max_validation_retries` times per format (default 1). Worst case with the defaults: 6 x 2 = **12 requests**.
+- **Transport retries.** A rate limit, timeout or server error is retried up to
+  `max_transport_retries` times per request (default 3), and every retry counts as a request. Worst
+  case with the defaults: 12 x 4 = **48 requests**, which needs a failure on every attempt.
+
+`run_meta.json` records `requests_sent` and `transport_retries`.
 
 ## Setup (once)
 
@@ -89,6 +98,28 @@ still saved, the failure is recorded in `run_meta.json`, and the command exits w
   captions list two times (09:00 and 18:00), but with the default 5 captions only 09:00 is used:
   18:00 is used only when two or more captions fall on the same day.
 
+## Quality checks
+
+Every prompt shares a `# Style` block (plain text, no hype, no stock openers, varied analogies). After
+each reply, `quality.py` checks the text offline for Markdown artifacts, extra exclamation marks or
+emoji, disallowed hashtags and pieces that open with the same words. A reply with style issues uses
+one of the format's repair requests (the same budget as invalid replies). If the issue remains after
+the last attempt, the format is still saved and the issues are recorded as `style_warnings` in
+`run_meta.json`. A visible emoji counts once, including variation-selector, skin-tone, flag, keycap
+and joined (ZWJ) sequences; plain symbols such as a check mark or an arrow are not emoji.
+
+If a reply was valid but had style issues, and the repair request then fails (an invalid reply, or a
+request error after any transport retries), the earlier valid reply is saved instead of being lost.
+`style_warnings` then ends with "The style-repair reply was invalid, so the earlier valid reply was
+kept." or "The style-repair request failed, so the earlier valid reply was kept." Content that fails
+schema, item-count or length validation is never saved. If no valid reply exists yet, the format
+fails as before.
+
+`validation_retries` in `run_meta.json` is the number of repair requests sent for that format, whether
+the reason was invalid output or style issues. `repeated_text` lists pieces from different formats
+that reuse the same wording. These checks cannot judge whether a claim is true to the source, so read
+the drafts before publishing.
+
 ## Project layout
 
 | Path | Purpose |
@@ -98,6 +129,7 @@ still saved, the failure is recorded in `run_meta.json`, and the command exits w
 | `loader.py` | Reads and cleans the input file |
 | `llm.py` | The only code that talks to OpenAI; handles retries |
 | `generators.py` | Builds prompts, validates replies, repairs once if invalid |
+| `quality.py` | Offline style checks and repeated-wording report |
 | `models.py` | Rules each format must meet (counts, character limits) |
 | `calendar.py` | Builds the schedule locally |
 | `writer.py` | Creates a fresh run folder and writes files without overwriting |

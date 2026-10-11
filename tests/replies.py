@@ -32,7 +32,7 @@ def _youtube_scripts(n):
         "scripts": [
             {
                 "title": f"Video {i}",
-                "hook": "Hook line.",
+                "hook": f"Hook line {i}.",
                 "body": f"Script {i} body.",
                 "call_to_action": "Subscribe.",
             }

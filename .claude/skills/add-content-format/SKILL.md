@@ -1,7 +1,7 @@
 ---
 name: add-content-format
 description: Add a new content format (e.g. a new platform) to content-engine safely and in dependency order. Edits schemas, config, prompt, generator, calendar and offline tests. Manual use only.
-argument-hint: [format-key]
+argument-hint: "[format-key]"
 disable-model-invocation: true
 ---
 
@@ -27,9 +27,10 @@ Use `$ARGUMENTS` as the format key if given. Collect all of these; ask for whate
 - Calendar: platform label, posting times (24h), and `first_day` (0-4, index into the 10 weekdays).
 - Position in generation order (default: end of `FORMATS`).
 - Prompt style rules (tone, structure, emoji/hashtags).
+- Quality rules for the new `RULES` entry in `src/content_engine/quality.py`: which text fields of one item are checked, which field's opening words must be unique across the set, the maximum exclamation marks and emoji per item, and whether hashtags are allowed in the text. These must agree with the prompt's style rules.
 
 ## Step 2: Inspect (read-only)
-Read `src/content_engine/{generators,models,calendar,config}.py`, `config/settings.yaml`, `tests/replies.py`, `tests/test_pipeline.py`, `tests/test_calendar.py`, `tests/test_prompts.py`, and the most similar existing format end to end plus its prompt. Note anything surprising.
+Read `src/content_engine/{generators,models,calendar,config,quality}.py`, `config/settings.yaml`, `tests/replies.py`, `tests/test_pipeline.py`, `tests/test_calendar.py`, `tests/test_prompts.py`, `tests/test_quality.py`, and the most similar existing format end to end plus its prompt and its `RULES` entry. Note anything surprising.
 
 ## Step 3: Present the plan, then WAIT
 Show the user: inputs gathered, every file to change with the exact edit, the new prompt text, and the risks. **Do not edit any project file until the user explicitly approves.**
@@ -41,14 +42,15 @@ Show the user: inputs gathered, every file to change with the exact edit, the ne
 4. `prompts/<key>.md`: same headings as the other prompts. Copy the shared block, from `# Source fidelity` up to (not including) `# Output format`, byte-for-byte from an existing prompt. Never reword it and never touch it in the existing prompts. Only `# Brand voice`, `# Task` and `# Output format` are new. Use only placeholders that `generate()` fills: `{{brand_voice}}`, `{{count}}`, and the keys in the format's `limits`.
 5. `src/content_engine/generators.py`: a `_<key>_markdown` renderer and a `FormatSpec` entry in `FORMATS`.
 6. `src/content_engine/calendar.py`: a `Channel` entry in `CHANNELS`. The key must equal the `FORMATS` key.
-7. `tests/replies.py`: a `BUILDERS` entry.
-8. `tests/test_pipeline.py`: add to `HEADINGS`; update the hard-coded `KEYS == [...]` list.
-9. `tests/test_calendar.py`: add the new format to the hard-coded totals and per-file counts. Extend the assertions; do not loosen them.
+7. `src/content_engine/quality.py`: **required.** Add an entry to the `RULES` table whose key equals the `FORMATS` key, defining the format's quality checks (text fields, field used for the unique-opening check, max exclamation marks, max emoji, hashtags allowed in text), matching the inputs from Step 1 and the prompt's style rules. `lint()` silently skips any key missing from `RULES`, so a missing entry means the new format gets no style checks at all.
+8. `tests/replies.py`: a `BUILDERS` entry. Its canned replies must pass the new format's own quality rules (for example, distinct opening words for each item), or the pipeline tests will trigger repair requests.
+9. `tests/test_pipeline.py`: add to `HEADINGS`; update the hard-coded `KEYS == [...]` list.
+10. `tests/test_calendar.py`: add the new format to the hard-coded totals and per-file counts. Extend the assertions; do not loosen them.
 
-`cli.py` and most of `test_prompts.py` iterate over `FORMATS`, so they need no edit.
+`cli.py`, `tests/test_quality.py` and most of `test_prompts.py` iterate over `FORMATS`, so they need no edit. The format is not complete until it has its `RULES` entry: `test_every_registered_format_has_rules` in `tests/test_quality.py` must cover it (it asserts that `RULES` and `FORMATS` have the same keys). Never weaken or skip that test to make a new format pass.
 
 ## Step 5: Offline verification
-Ask the user once for approval to run offline tests. If approved, run `pytest tests/test_prompts.py`, then `pytest`. If a test fails, diagnose and fix the implementation; do not change the test's intent. Never run the app or live tests.
+Ask the user once for approval to run offline tests. If approved, run `pytest tests/test_prompts.py tests/test_quality.py` (the latter includes `test_every_registered_format_has_rules`), then `pytest`. If a test fails, diagnose and fix the implementation; do not change the test's intent. Never run the app or live tests.
 
 ## Step 6: Documentation (only where now wrong)
 - `README.md`: the format list, the output-files list, and "identical in all five prompts" if outdated.
@@ -56,17 +58,18 @@ Ask the user once for approval to run offline tests. If approved, run `pytest te
 - Keep the test function name `test_shared_block_is_identical_across_all_five_prompts` unchanged unless there is a compelling technical reason.
 
 ## Step 7: Final review (no commit)
-Run read-only `git status` and `git diff --stat`. Report: files changed, tests run and results, and open decisions. Confirm that the shared block is identical across all prompts and that no file outside the allowed list changed.
+Run read-only `git status` and `git diff --stat`. Report: files changed, tests run and results, and open decisions. Confirm that the shared block is identical across all prompts, that the new format has a `RULES` entry in `src/content_engine/quality.py` covered by `test_every_registered_format_has_rules`, and that no file outside the allowed list changed. Do not report the format as complete if its quality rules are missing.
 
 ## Files this skill may modify
-`models.py`, `config.py`, `generators.py`, `calendar.py` (all under `src/content_engine/`), `config/settings.yaml`, the new `prompts/<key>.md`, `tests/replies.py`, `tests/test_pipeline.py`, `tests/test_calendar.py`, and, only if genuinely needed, `README.md` and `CLAUDE.md`.
+`models.py`, `config.py`, `generators.py`, `calendar.py`, `quality.py` (only its `RULES` table; all under `src/content_engine/`), `config/settings.yaml`, the new `prompts/<key>.md`, `tests/replies.py`, `tests/test_pipeline.py`, `tests/test_calendar.py`, and, only if genuinely needed, `README.md` and `CLAUDE.md`.
 
 ## Never modify
 `.env`, `.env.example`, `src/content_engine/llm.py`, `outputs/`, `pyproject.toml`, `tests/test_live.py`, the shared block of the existing five prompts, or this skill file.
 
 ## Key risks
 - Shared block drift (the prompt test catches it).
-- Key mismatch across `FORMATS`, `CHANNELS`, the prompt filename and the output filename.
+- Key mismatch across `FORMATS`, `CHANNELS`, `RULES`, the prompt filename and the output filename.
+- Missing or mismatched `RULES` entry in `quality.py`: the format would be unchecked, and `test_every_registered_format_has_rules` fails.
 - `count_attr` not matching the `Counts` field, or a YAML key added before the field.
 - Unfilled `{{placeholders}}` sent to the model.
 - Hard-coded test totals left stale.

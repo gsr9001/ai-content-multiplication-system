@@ -7,11 +7,12 @@ from datetime import date
 from pathlib import Path
 
 from content_engine import __version__
-from content_engine.calendar import build_calendar, calendar_csv, calendar_markdown, next_monday
+from content_engine.calendar import CHANNELS, build_calendar, calendar_csv, calendar_markdown, next_monday
 from content_engine.config import ConfigError, load_config
 from content_engine.generators import FORMATS, GenerationError, generate
 from content_engine.llm import LLMClient, LLMError
 from content_engine.loader import LoaderError, load_source
+from content_engine.quality import repeated_text
 from content_engine.writer import RunOutput, WriterError
 
 
@@ -84,10 +85,22 @@ def _run(args, root: Path, client) -> int:
             generated[key] = result.value
             run.write_text(f"{key}.md", spec.render(result.value))
             meta["formats"][key] = {"status": "ok", "validation_retries": result.validation_retries}
+            if result.warnings:
+                meta["formats"][key]["style_warnings"] = result.warnings
+                print(f"Warning: {key} saved with style issues (see run_meta.json)", file=sys.stderr)
         except (LLMError, GenerationError) as exc:
             meta["formats"][key] = {"status": "failed", "error": str(exc)}
             print(f"Error: {key} failed: {exc}", file=sys.stderr)
             status = 1
+    pieces = [
+        (f"{key}/{label}", text)
+        for key, value in generated.items()
+        for label, text in CHANNELS[key].items(value)
+    ]
+    repeats = repeated_text(pieces)
+    if repeats:
+        meta["repeated_text"] = repeats
+        print("Warning: some pieces repeat wording across formats (see run_meta.json)", file=sys.stderr)
     if generated:  # local, free: no extra request
         start = args.start_date or next_monday(date.today())
         entries = build_calendar(generated, start)

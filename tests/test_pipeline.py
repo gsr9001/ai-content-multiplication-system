@@ -2,12 +2,13 @@ import json
 import shutil
 from pathlib import Path
 
+import openai
 import pytest
 import yaml
 
 from content_engine.cli import main
 from content_engine.config import load_config
-from content_engine.generators import FORMATS, render_template
+from content_engine.generators import FORMATS, REPAIR_FAILED_NOTE, REPAIR_INVALID_NOTE, render_template
 from fake_llm import FakeOpenAI
 from replies import all_valid, count_of, counts_for, valid
 
@@ -267,7 +268,9 @@ def test_instagram_caption_over_2200_chars_is_rejected_then_repaired(project):
 
 def test_instagram_caption_of_exactly_2200_chars_is_accepted(project):
     counts = counts_for(project)
-    ok = json.dumps({"captions": [{"text": "c" * 2200}] * counts.instagram_captions})
+    ok = json.dumps(
+        {"captions": [{"text": f"Caption {i} ".ljust(2200, "c")} for i in range(counts.instagram_captions)]}
+    )
     fake = FakeOpenAI(script_with(counts, "instagram_captions", ok))
     assert run(project, fake) == 0
     assert len(fake.calls) == N
@@ -281,7 +284,151 @@ def test_formats_registered_in_documented_order():
 
 def test_tweet_of_exactly_280_chars_is_accepted(project):
     counts = counts_for(project)
-    ok = json.dumps({"tweets": [{"text": "x" * 280}] * counts.tweets})
+    ok = json.dumps({"tweets": [{"text": f"Tweet {i} ".ljust(280, "x")} for i in range(counts.tweets)]})
     fake = FakeOpenAI(script_with(counts, "tweets", ok))
     assert run(project, fake) == 0
     assert len(fake.calls) == N
+
+
+# --- style lint: one repair request, then keep the content with a warning -------
+
+
+def _tweets_reply(counts, texts):
+    return json.dumps({"tweets": [{"text": x} for x in texts(counts.tweets)]})
+
+
+def test_markdown_in_a_reply_triggers_one_repair_and_clean_reply_has_no_warning(project):
+    counts = counts_for(project)
+    bad = _tweets_reply(counts, lambda n: [f"Tip {i}: **bold** idea." for i in range(n)])
+    fake = FakeOpenAI(script_with(counts, "tweets", bad, valid("tweets", counts=counts)))
+    assert run(project, fake) == 0
+    assert len(fake.calls) == N + 1
+    assert "style rules" in fake.calls[1]["messages"][-1]["content"]
+    meta = json.loads((only_run_dir(project) / "run_meta.json").read_text(encoding="utf-8"))
+    assert "style_warnings" not in meta["formats"]["tweets"]
+
+
+def test_style_issue_after_the_repair_is_kept_with_a_warning(project, capsys):
+    counts = counts_for(project)
+    bad = _tweets_reply(counts, lambda n: [f"Tip {i}: **bold** idea." for i in range(n)])
+    fake = FakeOpenAI(script_with(counts, "tweets", bad, bad))
+    assert run(project, fake) == 0  # saved, not failed
+    assert len(fake.calls) == N + 1  # still only one repair request
+    meta = json.loads((only_run_dir(project) / "run_meta.json").read_text(encoding="utf-8"))
+    assert meta["formats"]["tweets"]["status"] == "ok"
+    assert meta["formats"]["tweets"]["style_warnings"]
+    assert (only_run_dir(project) / "tweets.md").exists()
+    assert "style issues" in capsys.readouterr().err
+
+
+def test_clean_run_still_sends_one_request_per_format_with_no_warnings(project):
+    fake = FakeOpenAI(all_valid(counts_for(project)))
+    assert run(project, fake) == 0
+    assert len(fake.calls) == N
+    meta = json.loads((only_run_dir(project) / "run_meta.json").read_text(encoding="utf-8"))
+    assert not any("style_warnings" in f for f in meta["formats"].values())
+
+
+def test_copied_wording_across_formats_is_recorded_in_run_meta(project):
+    counts = counts_for(project)
+    same = "start with one small example and then change one thing at a time to see the result"
+    li = json.dumps({"posts": [{"body": f"Post {i}: {same}", "hashtags": []} for i in range(counts.linkedin_posts)]})
+    tw = json.dumps({"tweets": [{"text": f"Tweet {i}: {same} again"} for i in range(counts.tweets)]})
+    script = []
+    for k in KEYS:
+        script.append(li if k == "linkedin" else tw if k == "tweets" else valid(k, counts=counts))
+    assert run(project, FakeOpenAI(script)) == 0
+    meta = json.loads((only_run_dir(project) / "run_meta.json").read_text(encoding="utf-8"))
+    assert meta["repeated_text"]
+
+
+# --- a failed style-repair never loses the earlier valid reply ------------------------
+
+
+def _style_bad_tweets(counts):
+    return _tweets_reply(counts, lambda n: [f"Tip {i}: **bold** idea." for i in range(n)])
+
+
+def _meta(project):
+    return json.loads((only_run_dir(project) / "run_meta.json").read_text(encoding="utf-8"))
+
+
+def test_invalid_style_repair_reply_keeps_the_earlier_valid_reply(project, capsys):
+    counts = counts_for(project)
+    fake = FakeOpenAI(script_with(counts, "tweets", _style_bad_tweets(counts), "not json"))
+    assert run(project, fake) == 0
+    assert len(fake.calls) == N + 1
+    tweets = _meta(project)["formats"]["tweets"]
+    assert tweets["status"] == "ok" and tweets["validation_retries"] == 1
+    assert tweets["style_warnings"][-1] == REPAIR_INVALID_NOTE
+    assert "Tip 0:" in (only_run_dir(project) / "tweets.md").read_text(encoding="utf-8")
+    assert "style issues" in capsys.readouterr().err
+
+
+def test_over_limit_style_repair_reply_is_never_saved(project):
+    counts = counts_for(project)
+    too_long = _tweets_reply(counts, lambda n: ["x" * 281] * n)
+    fake = FakeOpenAI(script_with(counts, "tweets", _style_bad_tweets(counts), too_long))
+    assert run(project, fake) == 0
+    saved = (only_run_dir(project) / "tweets.md").read_text(encoding="utf-8")
+    assert "Tip 0:" in saved and "x" * 281 not in saved
+    assert _meta(project)["formats"]["tweets"]["style_warnings"][-1] == REPAIR_INVALID_NOTE
+
+
+def test_wrong_count_style_repair_reply_keeps_the_earlier_valid_reply(project):
+    counts = counts_for(project)
+    short = _tweets_reply(counts, lambda n: ["Only one."])
+    fake = FakeOpenAI(script_with(counts, "tweets", _style_bad_tweets(counts), short))
+    assert run(project, fake) == 0
+    assert "Tip 0:" in (only_run_dir(project) / "tweets.md").read_text(encoding="utf-8")
+
+
+def test_transport_failure_during_style_repair_keeps_the_earlier_valid_reply(project, capsys):
+    counts = counts_for(project)
+    fake = FakeOpenAI(
+        script_with(counts, "tweets", _style_bad_tweets(counts), openai.OpenAIError("boom"))
+    )
+    assert run(project, fake) == 0  # not a failed format
+    assert len(fake.calls) == N + 1
+    tweets = _meta(project)["formats"]["tweets"]
+    assert tweets["status"] == "ok"
+    assert tweets["style_warnings"][-1] == REPAIR_FAILED_NOTE
+    assert "Tip 0:" in (only_run_dir(project) / "tweets.md").read_text(encoding="utf-8")
+    assert "Error:" not in capsys.readouterr().err
+
+
+def test_transport_failure_with_no_valid_reply_still_fails_the_format(project):
+    counts = counts_for(project)
+    fake = FakeOpenAI(script_with(counts, "tweets", openai.OpenAIError("boom")))
+    assert run(project, fake) == 1
+    assert _meta(project)["formats"]["tweets"]["status"] == "failed"
+    assert not (only_run_dir(project) / "tweets.md").exists()
+    assert (only_run_dir(project) / "linkedin.md").exists()  # other formats still saved
+
+
+def _set_validation_retries(project, n):
+    path = project / "config" / "settings.yaml"
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    data["max_validation_retries"] = n
+    path.write_text(yaml.safe_dump(data), encoding="utf-8")
+
+
+def test_zero_validation_retries_saves_style_bad_content_with_a_warning(project):
+    _set_validation_retries(project, 0)
+    counts = counts_for(project)
+    fake = FakeOpenAI(script_with(counts, "tweets", _style_bad_tweets(counts)))
+    assert run(project, fake) == 0
+    assert len(fake.calls) == N  # no repair request at all
+    tweets = _meta(project)["formats"]["tweets"]
+    assert tweets["validation_retries"] == 0 and tweets["style_warnings"]
+    assert REPAIR_INVALID_NOTE not in tweets["style_warnings"]
+
+
+def test_zero_validation_retries_still_fails_on_invalid_content(project):
+    _set_validation_retries(project, 0)
+    counts = counts_for(project)
+    fake = FakeOpenAI(script_with(counts, "tweets", "not json"))
+    assert run(project, fake) == 1
+    assert len(fake.calls) == N
+    assert _meta(project)["formats"]["tweets"]["status"] == "failed"
+    assert not (only_run_dir(project) / "tweets.md").exists()

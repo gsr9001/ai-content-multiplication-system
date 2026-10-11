@@ -182,3 +182,15 @@ def test_cli_rejects_bad_start_date(project, capsys):
     with pytest.raises(SystemExit):
         run(project, FakeOpenAI([]), "--start-date", "next tuesday")
     assert "YYYY-MM-DD" in capsys.readouterr().err
+
+
+def test_formats_open_on_staggered_days():
+    entries = build_calendar(results(), MONDAY)
+    first = {}
+    for e in entries:
+        first.setdefault(e.file, e.day)
+    opens_per_day = {}
+    for day in first.values():
+        opens_per_day[day] = opens_per_day.get(day, 0) + 1
+    assert max(opens_per_day.values()) <= 2  # no day starts three or more formats
+    assert first["substack_notes.md"] != first["linkedin.md"]

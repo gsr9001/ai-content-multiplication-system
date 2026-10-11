@@ -12,6 +12,7 @@ Flow: load config + source -> one LLM call per format -> validate -> build calen
 - `llm.py` - the only OpenAI client; retries/backoff and request counting
 - `loader.py` - reads and cleans the source file
 - `models.py` - pydantic schemas and length limits
+- `quality.py` - offline style lint (Markdown artifacts, exclamation marks, emoji, hashtags, repeated openings) and cross-format repeated-wording report
 - `generators.py` - fills `prompts/<key>.md`, validates replies, renders Markdown; formats registered in `FORMATS`
 - `calendar.py` - local scheduling; channels in `CHANNELS`
 - `writer.py` - creates timestamped run folders under `outputs/`

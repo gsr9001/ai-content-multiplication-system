@@ -10,7 +10,7 @@ Write exactly {{count}} distinct YouTube scripts based on the source material th
 - hook: the first 15 seconds, spoken aloud, that earns the viewer's attention.
 - body: the spoken script for the main content, written as natural speech with short paragraphs.
 - call_to_action: one closing line telling viewers what to do next.
-- The scripts are spoken aloud: use no emoji and no hashtags in any field.
+- The scripts are spoken aloud: use no emoji and no hashtags in any field, and no exclamation marks. Write speech, not on-screen text. The hook must not simply repeat the title.
 
 # Source fidelity
 - Anything you present as a fact, number, quotation, technical detail or example from the source must be supported by the source.
@@ -24,6 +24,12 @@ Write exactly {{count}} distinct YouTube scripts based on the source material th
 # Using the brand voice
 - Sample phrases show the tone. They are not text to copy or insert.
 - Use each sample phrase at most once per piece, skip it when it does not fit naturally, and never open more than one piece with the same phrase.
+
+# Style
+- Write plain text. Do not use Markdown: no asterisks or underscores for emphasis, backticks, "#" headings, ">" quotes, bullet dashes or tables. Use line breaks, and write steps as "1.", "2." only when a list helps.
+- Do not use hype or buzzwords. Use at most one exclamation mark per piece.
+- Avoid stock openers and filler such as "Ever wondered", "In today's fast-paced world", "Here's the thing", "Let's dive in" and "game-changer". Start from a concrete detail in the source.
+- Use at most one analogy per piece, and a different analogy or example in each piece of the set. A brand voice line that asks for analogies never overrides source fidelity.
 
 # Output format
 Reply with a single JSON object and nothing else:

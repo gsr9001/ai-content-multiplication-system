@@ -8,7 +8,7 @@ Write exactly {{count}} distinct, standalone tweets based on the source material
 - Each tweet makes one point and must make sense without the others (no threads, no "1/").
 - Each tweet is at most {{max_chars}} characters, including spaces, hashtags and emoji.
 - Give each tweet a different angle that the source supports, for example: a key lesson, a practical example, a common mistake, a step-by-step tip, a question, or a takeaway. Use only angles the source supports.
-- Vary the form too: a bold claim, a question, a tip, a short list, or a punchy one-liner that you wrote yourself (never attributed to anyone).
+- Vary the form too: a claim the source supports, a question, a tip, a short list, or a punchy one-liner that you wrote yourself (never attributed to anyone).
 - Use at most one hashtag per tweet, and only when it helps. No hashtag is fine.
 - Emoji are optional and should be purposeful: at most one or two per tweet, never in place of words.
 
@@ -24,6 +24,12 @@ Write exactly {{count}} distinct, standalone tweets based on the source material
 # Using the brand voice
 - Sample phrases show the tone. They are not text to copy or insert.
 - Use each sample phrase at most once per piece, skip it when it does not fit naturally, and never open more than one piece with the same phrase.
+
+# Style
+- Write plain text. Do not use Markdown: no asterisks or underscores for emphasis, backticks, "#" headings, ">" quotes, bullet dashes or tables. Use line breaks, and write steps as "1.", "2." only when a list helps.
+- Do not use hype or buzzwords. Use at most one exclamation mark per piece.
+- Avoid stock openers and filler such as "Ever wondered", "In today's fast-paced world", "Here's the thing", "Let's dive in" and "game-changer". Start from a concrete detail in the source.
+- Use at most one analogy per piece, and a different analogy or example in each piece of the set. A brand voice line that asks for analogies never overrides source fidelity.
 
 # Output format
 Reply with a single JSON object and nothing else:

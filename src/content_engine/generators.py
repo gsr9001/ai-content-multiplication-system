@@ -10,8 +10,9 @@ from typing import TypeVar
 from pydantic import BaseModel, ValidationError
 
 from content_engine.config import BrandVoice, Config
-from content_engine.llm import LLMClient
+from content_engine.llm import LLMClient, LLMError
 from content_engine.loader import Source
+from content_engine.quality import lint
 from content_engine.models import (
     INSTAGRAM_CAPTION_MAX_CHARS,
     LINKEDIN_MAX_CHARS,
@@ -29,6 +30,9 @@ from content_engine.models import (
 
 T = TypeVar("T")
 
+REPAIR_INVALID_NOTE = "The style-repair reply was invalid, so the earlier valid reply was kept."
+REPAIR_FAILED_NOTE = "The style-repair request failed, so the earlier valid reply was kept."
+
 
 class GenerationError(Exception):
     """Output still invalid after the allowed repair attempts."""
@@ -38,6 +42,7 @@ class GenerationError(Exception):
 class Generated:
     value: object
     validation_retries: int
+    warnings: list[str] = field(default_factory=list)  # style issues left after the repair retry
 
 
 def format_brand_voice(voice: BrandVoice) -> str:
@@ -69,26 +74,50 @@ def run_with_repair(
     user: str,
     parse: Callable[[str], T],
     max_validation_retries: int,
+    style_check: Callable[[T], list[str]] | None = None,
 ) -> Generated:
-    """Call the LLM; if the reply fails validation, send one repair request per retry allowed."""
+    """Call the LLM; if the reply fails validation, send one repair request per retry allowed.
+
+    Style issues (`style_check`) also use a repair request while one is left. After the last
+    attempt the content is kept and the remaining issues are returned as warnings, not errors.
+
+    The latest reply that passed `parse` (schema, item count, hard limits) but had style issues is
+    remembered. If a later repair request fails or returns invalid output, that reply is saved with
+    a warning instead of being lost. Content that failed `parse` is never returned.
+    """
     messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
+    fallback: tuple[T, list[str]] | None = None
     for attempt in range(max_validation_retries + 1):
-        reply = llm.complete_json(messages)
         try:
-            return Generated(parse(reply), attempt)
+            reply = llm.complete_json(messages)
+        except LLMError:
+            if fallback is None:
+                raise
+            return Generated(fallback[0], attempt, [*fallback[1], REPAIR_FAILED_NOTE])
+        try:
+            value = parse(reply)
+            issues = style_check(value) if style_check else []
+            if not issues:
+                return Generated(value, attempt)
+            fallback = (value, issues)
+            if attempt == max_validation_retries:
+                return Generated(value, attempt, issues)
+            problem = "Your reply broke style rules: " + "; ".join(issues)
         except (ValueError, ValidationError) as exc:  # json errors and pydantic both subclass ValueError
             if attempt == max_validation_retries:
+                if fallback is not None:
+                    return Generated(fallback[0], attempt, [*fallback[1], REPAIR_INVALID_NOTE])
                 raise GenerationError(
                     f"Output was invalid after {attempt + 1} attempt(s): {_short(exc)}"
                 ) from None
-            messages += [
-                {"role": "assistant", "content": reply},
-                {
-                    "role": "user",
-                    "content": f"Your reply was invalid: {_short(exc)}. "
-                    "Reply again with corrected JSON only, in the required format.",
-                },
-            ]
+            problem = f"Your reply was invalid: {_short(exc)}"
+        messages += [
+            {"role": "assistant", "content": reply},
+            {
+                "role": "user",
+                "content": f"{problem}. Reply again with corrected JSON only, in the required format.",
+            },
+        ]
     raise AssertionError("unreachable")
 
 
@@ -123,7 +152,10 @@ def generate(spec: FormatSpec, source: Source, config: Config, llm: LLMClient, p
             raise ValueError(f"Expected exactly {count} items in '{spec.items_attr}' but got {found}.")
         return result
 
-    return run_with_repair(llm, system, user, parse, config.settings.max_validation_retries)
+    def style_check(result: BaseModel) -> list[str]:
+        return lint(spec.key, [item.model_dump() for item in getattr(result, spec.items_attr)])
+
+    return run_with_repair(llm, system, user, parse, config.settings.max_validation_retries, style_check)
 
 
 def _linkedin_markdown(posts: LinkedInPosts) -> str:

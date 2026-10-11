@@ -20,6 +20,8 @@ class Channel:
     items: Callable[[BaseModel], list[tuple[str, str]]]  # model -> [(label, preview source)]
 
 
+# first_day values are staggered so different formats rarely open on the same weekday;
+# LinkedIn and tweets stay on day 0 because they lead the week.
 CHANNELS: dict[str, Channel] = {
     "linkedin": Channel(
         "LinkedIn", ("08:30",), 0,
@@ -34,11 +36,11 @@ CHANNELS: dict[str, Channel] = {
         lambda r: [(f"Section {i}: {s.heading}", s.body) for i, s in enumerate(r.sections, 1)],
     ),
     "substack_notes": Channel(
-        "Substack Notes", ("12:00",), 0,
+        "Substack Notes", ("12:00",), 3,
         lambda r: [(f"Note {i}", n.text) for i, n in enumerate(r.notes, 1)],
     ),
     "youtube_scripts": Channel(
-        "YouTube", ("10:00",), 2,
+        "YouTube", ("10:00",), 1,
         lambda r: [(f"Script {i}: {s.title}", s.hook) for i, s in enumerate(r.scripts, 1)],
     ),
     # 18:00 is used only when two or more captions fall on the same day (not with the default 5).

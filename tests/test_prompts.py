@@ -40,7 +40,7 @@ def has(pattern, text):
 @pytest.mark.parametrize("key", KEYS)
 def test_shared_block_has_all_three_sections(key):
     block = shared_block(prompt(key))
-    for heading in ("# Source fidelity", "# Variety", "# Using the brand voice"):
+    for heading in ("# Source fidelity", "# Variety", "# Using the brand voice", "# Style"):
         assert heading in block
 
 
@@ -118,6 +118,37 @@ def test_tweets_do_not_encourage_invented_quotes():
     text = prompt("tweets")
     assert "quotable line" not in text
     assert has(r"never attributed to anyone", text)
+
+
+# --- C2. style: plain text, no hype, no stock openers, varied analogies ------------
+
+
+@pytest.mark.parametrize("key", KEYS)
+def test_style_rules_present(key):
+    text = prompt(key)
+    assert has(r"do not use markdown", text)
+    assert has(r"at most one exclamation mark per piece", text)
+    assert has(r"do not use hype or buzzwords", text)
+    assert has(r"avoid stock openers", text)
+    assert has(r"different analogy or example in each piece", text)
+    assert has(r"never overrides source fidelity", text)
+
+
+def test_instagram_emoji_matches_other_formats():
+    text = prompt("instagram_captions")
+    assert has(r"emoji are optional", text) and has(r"at most one or two per caption", text)
+    assert not has(r"emoji are allowed", text)
+
+
+def test_youtube_has_no_exclamations_and_hook_not_title():
+    text = prompt("youtube_scripts")
+    assert has(r"no exclamation marks", text)
+    assert has(r"must not simply repeat the title", text)
+
+
+@pytest.mark.parametrize("key", ["newsletter", "substack_notes"])
+def test_long_text_formats_forbid_headings_and_lists_in_body(key):
+    assert has(r"no headings or lists", prompt(key))
 
 
 # --- D. emoji and hashtags -------------------------------------------------------
@@ -301,4 +332,4 @@ def test_rendered_prompts_contain_the_shared_rules_for_every_format(project):
         system = call["messages"][0]["content"]
         blocks.add(shared_block(system))
         assert "supported by the source" in system and "at most once per piece" in system
-    assert len(blocks) == 1  # the same block was sent for all five formats
+    assert len(blocks) == 1  # the same block was sent for all formats
