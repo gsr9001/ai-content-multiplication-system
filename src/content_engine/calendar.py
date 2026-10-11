@@ -41,6 +41,11 @@ CHANNELS: dict[str, Channel] = {
         "YouTube", ("10:00",), 2,
         lambda r: [(f"Script {i}: {s.title}", s.hook) for i, s in enumerate(r.scripts, 1)],
     ),
+    # 18:00 is used only when two or more captions fall on the same day (not with the default 5).
+    "instagram_captions": Channel(
+        "Instagram", ("09:00", "18:00"), 2,
+        lambda r: [(f"Caption {i}", c.text) for i, c in enumerate(r.captions, 1)],
+    ),
 }
 
 

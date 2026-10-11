@@ -22,6 +22,7 @@ HEADINGS = {
     "newsletter": "# Newsletter sections",
     "substack_notes": "# Substack Notes",
     "youtube_scripts": "# YouTube scripts",
+    "instagram_captions": "# Instagram Captions",
 }
 
 
@@ -174,7 +175,8 @@ def test_one_failing_format_does_not_stop_the_others(project, key, capsys):
 
 
 NEW_COUNTS = dict(
-    linkedin_posts=2, tweets=4, newsletter_sections=1, substack_notes=2, youtube_scripts=1
+    linkedin_posts=2, tweets=4, newsletter_sections=1, substack_notes=2, youtube_scripts=1,
+    instagram_captions=2,
 )
 
 
@@ -194,7 +196,7 @@ def test_changed_counts_flow_through_prompts_files_and_calendar(project):
         system = fake.calls[KEYS.index(key)]["messages"][0]["content"]
         assert f"exactly {n} " in system
     meta = json.loads((out / "run_meta.json").read_text(encoding="utf-8"))
-    assert meta["calendar"]["entries"] == sum(count_of(k, counts) for k in KEYS) == 10
+    assert meta["calendar"]["entries"] == sum(count_of(k, counts) for k in KEYS) == 12
 
 
 def test_replies_sized_to_the_old_counts_are_rejected_after_a_change(project):
@@ -255,8 +257,26 @@ def test_newsletter_empty_body_is_rejected_then_repaired(project):
     assert len(fake.calls) == N + 1
 
 
-def test_five_formats_registered_in_documented_order():
-    assert KEYS == ["linkedin", "tweets", "newsletter", "substack_notes", "youtube_scripts"]
+def test_instagram_caption_over_2200_chars_is_rejected_then_repaired(project):
+    counts = counts_for(project)
+    bad = json.dumps({"captions": [{"text": "c" * 2201}] * counts.instagram_captions})
+    fake = FakeOpenAI(script_with(counts, "instagram_captions", bad, valid("instagram_captions", counts=counts)))
+    assert run(project, fake) == 0
+    assert len(fake.calls) == N + 1
+
+
+def test_instagram_caption_of_exactly_2200_chars_is_accepted(project):
+    counts = counts_for(project)
+    ok = json.dumps({"captions": [{"text": "c" * 2200}] * counts.instagram_captions})
+    fake = FakeOpenAI(script_with(counts, "instagram_captions", ok))
+    assert run(project, fake) == 0
+    assert len(fake.calls) == N
+
+
+def test_formats_registered_in_documented_order():
+    assert KEYS == [
+        "linkedin", "tweets", "newsletter", "substack_notes", "youtube_scripts", "instagram_captions",
+    ]
 
 
 def test_tweet_of_exactly_280_chars_is_accepted(project):

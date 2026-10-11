@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 ## 1. Project Overview
-`content-engine` turns one `.txt`/`.md` article or transcript into a multi-platform content pack (LinkedIn posts, tweets, newsletter sections, Substack Notes, YouTube scripts) in a configured brand voice, plus a two-week posting calendar (CSV + Markdown). Python 3.10+, OpenAI chat completions (one request per format), pydantic validation.
+`content-engine` turns one `.txt`/`.md` article or transcript into a multi-platform content pack (LinkedIn posts, tweets, newsletter sections, Substack Notes, YouTube scripts, Instagram captions) in a configured brand voice, plus a two-week posting calendar (CSV + Markdown). Python 3.10+, OpenAI chat completions (one request per format), pydantic validation.
 
 Flow: load config + source -> one LLM call per format -> validate -> build calendar locally -> write a new run folder in `outputs/`.
 
@@ -16,7 +16,7 @@ Flow: load config + source -> one LLM call per format -> validate -> build calen
 - `calendar.py` - local scheduling; channels in `CHANNELS`
 - `writer.py` - creates timestamped run folders under `outputs/`
 
-Other: `prompts/` (5 templates), `config/` (settings + brand voice), `inputs/` (sources), `tests/` (offline tests, `tests/fake_llm.py` fake client, one opt-in live test).
+Other: `prompts/` (one template per format), `config/` (settings + brand voice), `inputs/` (sources), `tests/` (offline tests, `tests/fake_llm.py` fake client, one opt-in live test).
 
 ## 3. Critical Rules
 - **Secrets:** Never open, read, print, expose, or commit the contents of `.env` or any API secret. You may refer to the filename and explain how configuration works, but do not inspect secret values. The key is supplied as `OPENAI_API_KEY`, from the environment or from `.env`.
@@ -24,7 +24,7 @@ Other: `prompts/` (5 templates), `config/` (settings + brand voice), `inputs/` (
 - Prefer offline tests for routine verification.
 - `outputs/` is generated output (gitignored). Never overwrite or delete existing runs.
 - Only `src/content_engine/llm.py` may communicate with the OpenAI API.
-- **Shared prompt block:** The text from `# Source fidelity` through `# Using the brand voice` (everything before `# Output format`) must stay identical across all five `prompts/*.md`. This is enforced by `test_shared_block_is_identical_across_all_five_prompts` in `tests/test_prompts.py`.
+- **Shared prompt block:** The text from `# Source fidelity` through `# Using the brand voice` (everything before `# Output format`) must stay identical across all prompt templates. This is enforced by `test_shared_block_is_identical_across_all_five_prompts` in `tests/test_prompts.py`.
 - Inspect before modifying files, and explain risky changes before proceeding.
 
 ## 4. Development Setup and Commands

@@ -42,6 +42,7 @@ class Counts(BaseModel):
     newsletter_sections: int = Field(3, ge=1)
     substack_notes: int = Field(3, ge=1)
     youtube_scripts: int = Field(2, ge=1)
+    instagram_captions: int = Field(5, ge=1)
 
 
 class Settings(BaseModel):

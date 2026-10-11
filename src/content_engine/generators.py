@@ -13,11 +13,13 @@ from content_engine.config import BrandVoice, Config
 from content_engine.llm import LLMClient
 from content_engine.loader import Source
 from content_engine.models import (
+    INSTAGRAM_CAPTION_MAX_CHARS,
     LINKEDIN_MAX_CHARS,
     NEWSLETTER_HEADING_MAX_CHARS,
     SUBSTACK_NOTE_MAX_CHARS,
     TWEET_MAX_CHARS,
     YOUTUBE_TITLE_MAX_CHARS,
+    InstagramCaptions,
     LinkedInPosts,
     NewsletterSections,
     SubstackNotes,
@@ -165,6 +167,13 @@ def _youtube_scripts_markdown(data: YouTubeScripts) -> str:
     return "\n".join(parts)
 
 
+def _instagram_captions_markdown(data: InstagramCaptions) -> str:
+    parts = ["# Instagram Captions\n"]
+    for i, caption in enumerate(data.captions, 1):
+        parts.append(f"## Caption {i}\n\n{caption.text.strip()}\n")
+    return "\n".join(parts)
+
+
 # Order here = order of generation = one OpenAI request each.
 FORMATS: dict[str, FormatSpec] = {
     "linkedin": FormatSpec(
@@ -186,5 +195,9 @@ FORMATS: dict[str, FormatSpec] = {
     "youtube_scripts": FormatSpec(
         "youtube_scripts", "youtube_scripts", YouTubeScripts, "scripts", _youtube_scripts_markdown,
         {"max_title_chars": str(YOUTUBE_TITLE_MAX_CHARS)},
+    ),
+    "instagram_captions": FormatSpec(
+        "instagram_captions", "instagram_captions", InstagramCaptions, "captions",
+        _instagram_captions_markdown, {"max_chars": str(INSTAGRAM_CAPTION_MAX_CHARS)},
     ),
 }

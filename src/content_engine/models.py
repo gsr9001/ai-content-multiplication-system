@@ -70,3 +70,16 @@ class NewsletterSection(BaseModel):
 class NewsletterSections(BaseModel):
     model_config = ConfigDict(extra="ignore")
     sections: list[NewsletterSection]
+
+
+INSTAGRAM_CAPTION_MAX_CHARS = 2200
+
+
+class InstagramCaption(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    text: str = Field(min_length=1, max_length=INSTAGRAM_CAPTION_MAX_CHARS)
+
+
+class InstagramCaptions(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    captions: list[InstagramCaption]

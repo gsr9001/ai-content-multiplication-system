@@ -41,12 +41,17 @@ def _youtube_scripts(n):
     }
 
 
+def _instagram_captions(n):
+    return {"captions": [{"text": f"Caption number {i}."} for i in range(n)]}
+
+
 BUILDERS = {
     "linkedin": _linkedin,
     "tweets": _tweets,
     "newsletter": _newsletter,
     "substack_notes": _substack_notes,
     "youtube_scripts": _youtube_scripts,
+    "instagram_captions": _instagram_captions,
 }
 
 

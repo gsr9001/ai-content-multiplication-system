@@ -7,9 +7,10 @@ Turn one article or transcript into a full content pack, written in your brand v
 - 3 newsletter sections
 - 3 Substack Notes
 - 2 YouTube scripts
+- 5 Instagram captions
 - A two-week content calendar (CSV and Markdown)
 
-It uses the OpenAI API. A normal run sends **5 requests** (one per format). The calendar is built
+It uses the OpenAI API. A normal run sends **6 requests** (one per format). The calendar is built
 locally and costs nothing. Retries only happen when a request fails or returns invalid output.
 
 ## Setup (once)
@@ -66,7 +67,7 @@ Each run creates a new folder, for example `outputs\2026-10-10_143205_my-article
 
 | File | Contents |
 |---|---|
-| `linkedin.md`, `tweets.md`, `newsletter.md`, `substack_notes.md`, `youtube_scripts.md` | The generated content |
+| `linkedin.md`, `tweets.md`, `newsletter.md`, `substack_notes.md`, `youtube_scripts.md`, `instagram_captions.md` | The generated content |
 | `calendar.csv`, `calendar.md` | The two-week schedule |
 | `run_meta.json` | Model, brand voice, input hash, per-format status, requests and retries (never your key) |
 
@@ -83,8 +84,10 @@ still saved, the failure is recorded in `run_meta.json`, and the command exits w
   name is a current one before your first run.
 - **Prompts:** edit the files in `prompts\`. Keep the `{{placeholders}}` and the JSON output format.
   The shared rules block (from `# Source fidelity` to just before `# Output format`) must stay
-  identical in all five prompts; a test checks this, so change it in every file.
-- **Calendar times and spacing:** see `CHANNELS` in `src\content_engine\calendar.py`.
+  identical in all prompts; a test checks this, so change it in every file.
+- **Calendar times and spacing:** see `CHANNELS` in `src\content_engine\calendar.py`. Instagram
+  captions list two times (09:00 and 18:00), but with the default 5 captions only 09:00 is used:
+  18:00 is used only when two or more captions fall on the same day.
 
 ## Project layout
 
@@ -110,7 +113,7 @@ pytest
 Ordinary tests never use the network or a real API key: a fake OpenAI client is used, network
 access is blocked, and `OPENAI_API_KEY` is cleared while they run.
 
-There is one opt-in live test that makes real API calls (about 5 requests):
+There is one opt-in live test that makes real API calls (about 6 requests):
 
 ```powershell
 pytest -m live
@@ -120,5 +123,8 @@ pytest -m live
 
 - Tweet length is checked in characters. X counts links and some emoji differently, so check long
   or link-heavy tweets before posting.
+- Instagram caption length (2,200 characters) is also checked in characters by this application.
+  Instagram's own counting may differ slightly, especially for emoji, so check captions that are
+  close to the limit on the platform before posting.
 - The system writes drafts. It does not post anywhere. Read everything before publishing.
 - Very long inputs cost more and may exceed the model's context window.

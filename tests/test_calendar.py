@@ -31,13 +31,13 @@ def results(keys=None):
 
 def test_one_entry_per_piece():
     entries = build_calendar(results(), MONDAY)
-    assert len(entries) == 5 + 10 + 3 + 3 + 2
+    assert len(entries) == 5 + 10 + 3 + 3 + 2 + 5
     by_file = {}
     for e in entries:
         by_file[e.file] = by_file.get(e.file, 0) + 1
     assert by_file == {
         "linkedin.md": 5, "tweets.md": 10, "newsletter.md": 3, "substack_notes.md": 3,
-        "youtube_scripts.md": 2,
+        "youtube_scripts.md": 2, "instagram_captions.md": 5,
     }
 
 
@@ -78,7 +78,7 @@ def test_only_successful_formats_appear():
 
 def test_start_on_a_non_monday_still_works():
     entries = build_calendar(results(), date(2026, 10, 10))  # a Saturday
-    assert len(entries) == 23 and all(e.day.weekday() < 5 for e in entries)
+    assert len(entries) == 28 and all(e.day.weekday() < 5 for e in entries)
     assert all(0 <= (e.day - date(2026, 10, 10)).days < 14 for e in entries)
 
 
